@@ -3,16 +3,15 @@ module Dual where
 import Debug
 import Color
 import Signal
-import Html
-import Html(..)
-import Html.Events(..)
-import Html.Attributes(..)
+import Html exposing (..)
+import Html.Events exposing (..)
+import Html.Attributes exposing (..)
 import DragAndDrop as DD
-import Graphics.Collage(..)
-import Graphics.Element(..)
+import Graphics.Collage exposing (..)
+import Graphics.Element exposing (..)
 
-hoverChan : Signal.Channel (Int, Bool)
-hoverChan = Signal.channel (0, False)
+hoverChan : Signal.Mailbox (Int, Bool)
+hoverChan = Signal.mailbox (0, False)
 
 type alias Point = (Float, Float)
 
@@ -26,7 +25,8 @@ handle : Int -> Point -> Form
 handle i pos =
   let (w, h) = (10, 10) in
   div
-  [ onMouseEnter (Signal.send hoverChan (i, True)), onMouseLeave (Signal.send hoverChan (i, False))
+  [ onMouseEnter hoverChan.address (i, True)
+  , onMouseLeave hoverChan.address (i, False)
   , style
     [ ("width", px w), ("height", px h)
     , ("borderRadius", px (w / 2))
@@ -37,8 +37,12 @@ handle i pos =
   |> toForm
   |> move pos
 
+actionSignal : Int -> Signal (Maybe DD.Action)
 actionSignal i =
-  DD.track False (Signal.map snd <| Signal.keepIf (((==) i) << fst) (0, False) <| Signal.subscribe hoverChan)
+  hoverChan.signal
+  |> Signal.filter (\(j, _) -> i == j) (0, False)
+  |> Signal.map snd
+  |> DD.track False
 
 integrate i pos0 =
   actionSignal i |>
